@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+	<extension point="org.eclipse.emf.ecore.generated_package">
+		<package 
+			uri = "http://www.ripacola.org/lang/Ripacola"
+			class = "org.ripacola.lang.ripacola.RipacolaPackage"
+			genModel = "model/generated/Ripacola.genmodel" />
+	</extension>
+</plugin>

@@ -1,0 +1,57 @@
+type read_state;
+type disp_state;
+type pixel = int;
+
+parameter width: int = 352;
+parameter height: int = 288;
+parameter index: int = 0;
+parameter nbSlice: int = 8;
+parameter sliceHeight: int = height/nbSlice+2;
+
+actor Read_YUV(
+  in param width: int,
+  in param height: int,
+  out data y[height*width]: pixel,
+  out data u[height/2*width/2]: pixel,
+  out data v[height/2*width/2]: pixel,
+  state z: read_state
+  );
+
+actor Split(
+  in param nbSlice: int,
+  in param width: int,
+  in param height: int,
+  in data input[height*width]: pixel,
+  out data output[nbSlice*(height/nbSlice/2)]: pixel
+  );
+
+actor Sobel(
+  in param width: int,
+  in param height: int,
+  in data input[height*width]: pixel,
+  out data output[height*width]: pixel
+  );
+
+actor Merge(
+  in param nbSlice: int,
+  in param width: int,
+  in param height: int,
+  in data input[nbSlice*(height/nbSlice/2)]: pixel,
+  out data output[height*width]: pixel
+  );
+
+actor Display(
+  in param id: int,
+  in param width: int,
+  in param height: int,
+  in data y[height*width]: pixel,
+  in data u[height/2*width/2]: pixel,
+  in data v[height/2*width/2]: pixel,
+  state z: disp_state
+  );
+
+net (y,u,v) = Read_YUV(width, height);
+net y1 = Split(nbSlice, width, height, y);
+net y2 = Sobel(width, height, y1);
+net y3 = Merge(nbSlice, width, height, y2);
+net () = Display(index, width, height, y3, u, v);

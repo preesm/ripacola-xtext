@@ -1,0 +1,22 @@
+type pixel = int;
+
+parameter width : int = -128;
+
+actor Inp(
+  out data e[1]: pixel,
+  state z: unit
+  );
+
+actor Foo(
+  in param w: int,
+  in data e[1]: pixel,
+  out data e[1]: pixel
+  );
+
+actor Outp(
+  in data e[1]: pixel,
+  state z: unit
+  );
+
+net () = Outp (Foo (width, Inp ()));
+

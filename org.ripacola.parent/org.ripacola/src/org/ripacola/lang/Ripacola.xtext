@@ -1,0 +1,189 @@
+grammar org.ripacola.lang.Ripacola hidden(WS, SL_COMMENT, INCLUDE)
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+generate ripacola "http://www.ripacola.org/lang/Ripacola"
+
+Program:
+	declarations+=Declaration*;
+
+Declaration: {Declaration} TypeDeclaration ';'
+	| ParameterDeclaration ';'
+	| ActorDeclaration ';'
+	| NetDeclaration ';'
+;
+
+
+
+/* ****************************************************************
+   **		TYPE Decls
+   **************************************************************** */
+
+TypeDeclaration: 'type' ID
+	| 'type' ID '=' Type
+;
+
+ParameterDeclaration: 'parameter' ID ':' SimpleType '=' Expression;
+
+
+
+/* ****************************************************************
+   **		ACTOR Decls
+   **************************************************************** */
+
+ActorDeclaration: 'actor' id=ID '(' (ios+=ActorIO (',' ios+=ActorIO)*)? ')';
+
+ActorIO: ('in'|'out') 'param' id=ID ':' SimpleType
+	| ('in'|'out') 'data' id=ID '[' expr=Expression ']' ':' SimpleType
+	| 'state' id=ID ':' ID
+;
+
+NetDeclaration: 'net' bindings+=NetBinding ('and' bindings+=NetBinding)*
+	// TODO: net rec
+;
+
+NetBinding: pattern=NetPattern '=' expr=NetExpression
+	// TODO | ID patterns+=NetPattern ('=' NetPattern)* '=' NetExpression
+;
+
+NetPattern: {NetPattern} ID
+	| '(' patterns+=NetPattern (',' patterns+=NetPattern)* ')'
+	| {NetPattern} '(' ')'
+;
+
+NetExpression: (exprs+=SimpleNetExpression)+
+	| 'function' pattern=NetPattern '->' expr=NetExpression
+	| 'let' binding=NetBinding 'in' expr=NetExpression
+	// TODO: let rec
+;
+
+SimpleNetExpression: {SimpleNetExpression} ID
+	| {SimpleNetExpression} '(' ')'
+	| '(' exprs+=NetExpression (',' exprs+=NetExpression)* ')'
+;
+
+
+/* ****************************************************************
+   **		Expressions
+   **************************************************************** */
+
+Expression: Addition | '-' Expression;
+
+Addition returns Expression:
+  Multiplication ({Addition.left=current} op=('+' | '-') right=Multiplication)*;
+
+Multiplication returns Expression:
+  Primary ({Multiplication.left=current} op=('*' | '/' | 'mod') right=Primary)*;
+
+Primary returns Expression: {Expression} ScalarConstant
+	| '(' Expression ')'
+	| var=ID ('[' indexes+=ArrayIndex ']')*
+	;
+
+ArrayInit:
+	ArrayExt1 | ArrayExt2 | ArrayExt3 | '[' ArrayComprehension ']'
+;
+
+ArrayExt1:
+	'[' indexes+=Expression (',' indexes+=Expression)* ']'
+;
+
+ArrayExt2:
+	'[' indexes+=ArrayExt1 (',' indexes+=ArrayExt1)* ']'
+;
+
+ArrayExt3:
+	'[' indexes+=ArrayExt2 (',' indexes+=ArrayExt2)* ']'
+;
+
+ArrayComprehension:
+	'[' Expression | '|' ranges+=IndexRange (',' ranges+=IndexRange)* ']'
+;
+
+IndexRange: ID '=' from=ArrayIndex 'to' to=ArrayIndex;
+
+ArrayIndex: Expression;
+
+/* ****************************************************************
+   **		CONSTANTS
+   **************************************************************** */
+
+ScalarConstant:
+	INTCONST | BOOLEANCONST | FLOATCONST
+;
+
+Array1Constant:
+	'[' ScalarConstant (',' ScalarConstant)* ']'
+;
+
+Array2Constant:
+	'[' Array1Constant (',' Array1Constant)* ']'
+;
+
+
+/* ****************************************************************
+   **		Type Expressions
+   **************************************************************** */
+
+Type: TypeProduct | TypeProduct '->' Type;
+
+TypeProduct: NamedType ('*' NamedType)*;
+
+NamedType: ArrayType (ID ('[' Size ']')?)?;
+
+ArrayType: SimpleType ('array'  '[' Size ']'  ('[' Size ']')? )?;
+
+SimpleType:
+	'signed' '<' Size '>'
+	| 'unsigned' '<' Size '>'
+	| 'int' ('<' ( Sign ',')? Size '>')?
+	| ID
+//	| '(' Type ')' // XXX
+;
+
+Sign: '_signed' | '_unsigned';
+
+Size: INTCONST | SIZEVAR;
+
+ArraySize: INTCONST;
+
+VarType: Type
+	| '{' Ctors '}'
+	| '{' IntRange '}'
+;
+
+Ctors:
+	ID (',' Ctors)?
+;
+
+IntRange: INTCONST ',..,' INTCONST;
+
+/* ****************************************************************
+   **		TERMINALS
+   **************************************************************** */
+
+/* terminal */ VAR: ID;
+/* terminal */ ATTR: ID;
+
+terminal INTCONST returns ecore::EInt: DIGIT+;
+terminal FIXINTCONST: (RADIX)? DIGIT+;
+terminal FLOATCONST returns ecore::EFloat: DIGIT+ ('.' DIGIT*)? (("e"|"E")("+"|"-")DIGIT+)?;
+terminal BOOLEANCONST returns ecore::EBoolean: ('true'|'false');
+
+terminal RADIX: 'Ox' | 'Ob';
+
+terminal ID: (LETTER|ULETTER ) (ULETTER | LETTER | DIGIT | '_' | "'" )*;
+
+terminal LETTER: ('a'..'z');
+/* terminal */ SIZEVAR: ID;
+
+terminal ULETTER: ('A'..'Z');
+terminal DIGIT: ('0'..'9');
+terminal STRING:
+			'"' ( '\\' . /* 'b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\' */ | !('\\'|'"') )* '"'
+		;
+//terminal ML_COMMENT : '/*' -> '*/';
+terminal SL_COMMENT : '--' !('\n'|'\r')* ('\r'? '\n')? ;
+terminal INCLUDE: '#include' !('\n'|'\r')* ('\r'? '\n')? ;
+
+terminal WS         : (' '|'\t'|'\r'|'\n')+;
+
+terminal ANY_OTHER: .;
