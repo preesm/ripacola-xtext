@@ -5,7 +5,7 @@ generate ripacola "http://www.ripacola.org/lang/Ripacola"
 Program:
 	declarations+=Declaration*;
 
-Declaration: {Declaration} TypeDeclaration ';'
+Declaration: TypeDeclaration ';'
 	| ParameterDeclaration ';'
 	| ActorDeclaration ';'
 	| NetDeclaration ';'
@@ -17,11 +17,11 @@ Declaration: {Declaration} TypeDeclaration ';'
    **		TYPE Decls
    **************************************************************** */
 
-TypeDeclaration: 'type' ID
-	| 'type' ID '=' Type
+TypeDeclaration: 'type' name=ID
+	| 'type' name=ID '=' target=Type
 ;
 
-ParameterDeclaration: 'parameter' ID ':' SimpleType '=' Expression;
+ParameterDeclaration: 'parameter' name=ID ':' type=SimpleType '=' value=Expression;
 
 
 
@@ -29,18 +29,18 @@ ParameterDeclaration: 'parameter' ID ':' SimpleType '=' Expression;
    **		ACTOR Decls
    **************************************************************** */
 
-ActorDeclaration: 'actor' id=ID '(' (ios+=ActorIO (',' ios+=ActorIO)*)? ')';
+ActorDeclaration: 'actor' name=ID '(' (ios+=ActorIO (',' ios+=ActorIO)*)? ')';
 
-ActorIO: ('in'|'out') 'param' id=ID ':' SimpleType
-	| ('in'|'out') 'data' id=ID '[' expr=Expression ']' ':' SimpleType
-	| 'state' id=ID ':' ID
+ActorIO: ('in'|'out') 'param' name=ID ':' type=Type
+	| ('in'|'out') 'data' name=ID '[' expr=Expression ']' ':' type=Type
+	| 'state' name=ID ':' type=Type
 ;
 
 NetDeclaration: 'net' bindings+=NetBinding ('and' bindings+=NetBinding)*
 	// TODO: net rec
 ;
 
-NetBinding: pattern=NetPattern '=' expr=NetExpression
+NetBinding: name=NetPattern '=' expr=NetExpression
 	// TODO | ID patterns+=NetPattern ('=' NetPattern)* '=' NetExpression
 ;
 
@@ -123,31 +123,37 @@ Array2Constant:
    **		Type Expressions
    **************************************************************** */
 
-Type: TypeProduct | TypeProduct '->' Type;
+Type: TypeProduct | TypeProduct '->' target=Type;
 
-TypeProduct: NamedType ('*' NamedType)*;
+TypeProduct: named+=NamedType ('*' named+=NamedType)*;
 
 NamedType: ArrayType (ID ('[' Size ']')?)?;
 
 ArrayType: SimpleType ('array'  '[' Size ']'  ('[' Size ']')? )?;
 
-SimpleType:
-	'signed' '<' Size '>'
-	| 'unsigned' '<' Size '>'
-	| 'int' ('<' ( Sign ',')? Size '>')?
-	| ID
-//	| '(' Type ')' // XXX
+//SimpleType:
+//	('signed'|'unsigned') '<' size=Size '>'
+//	|{SimpleType} 'int' ('<' ( sign=('_signed' | '_unsigned') ',')? size=Size '>')?
+//	| ref=[TypeDeclaration]
+//;
+
+
+
+SimpleType: WireType | IntType
+	| base=[TypeDeclaration]
 ;
 
-Sign: '_signed' | '_unsigned';
+WireType: ('signed'|'unsigned') '<' size=Size '>';
+
+IntType: {IntType} 'int' ('<' ( sign=('_signed' | '_unsigned') ',')? size=Size '>')?;
 
 Size: INTCONST | SIZEVAR;
 
 ArraySize: INTCONST;
 
 VarType: Type
-	| '{' Ctors '}'
-	| '{' IntRange '}'
+	| {VarType} '{' Ctors '}'
+	| {VarType} '{' IntRange '}'
 ;
 
 Ctors:
